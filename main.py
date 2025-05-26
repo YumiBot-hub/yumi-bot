@@ -1,54 +1,50 @@
 import os
 import logging
 from fastapi import FastAPI, Request
-from telegram import Update
-from bot import get_application
-import asyncio
+from contextlib import asynccontextmanager
 import httpx
 
-# Logging
+from bot import app as telegram_app  # Telegram Application
+from telegram import Update
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# ENV
-PORT = int(os.environ.get("PORT", 10000))
 BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
-RENDER_EXTERNAL_URL = os.getenv("RENDER_EXTERNAL_URL")
-WEBHOOK_PATH = "/webhook"
-WEBHOOK_URL = f"{RENDER_EXTERNAL_URL}{WEBHOOK_PATH}"
+WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # z. B. https://dein-bot-name.onrender.com/webhook
 
-# FastAPI App
-app = FastAPI()
-telegram_app = get_application()
+if not BOT_TOKEN or not WEBHOOK_URL:
+    raise EnvironmentError("TELEGRAM_TOKEN oder WEBHOOK_URL fehlen!")
 
-# FastAPI: root test
-@app.get("/")
-def home():
-    return {"status": "ok"}
-
-# FastAPI: Webhook Endpoint
-@app.post(WEBHOOK_PATH)
-async def telegram_webhook(req: Request):
-    data = await req.json()
-    update = Update.de_json(data, telegram_app.bot)
-    await telegram_app.process_update(update)
-    logger.info("✅ Telegram Update empfangen: %s", data)
-    return {"ok": True}
-
-# FastAPI: Startup -> Telegram Bot Initialisieren + Webhook setzen
-@app.on_event("startup")
-async def on_startup():
-    await telegram_app.initialize()  # <- Wichtig
+# Lifespan ersetzt @app.on_event("startup") und @app.on_event("shutdown")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await telegram_app.initialize()
     await telegram_app.start()
+
     async with httpx.AsyncClient() as client:
         r = await client.post(
             f"https://api.telegram.org/bot{BOT_TOKEN}/setWebhook",
-            params={"url": WEBHOOK_URL}
+            params={"url": f"{WEBHOOK_URL}/webhook"}
         )
         logger.info("📡 Webhook gesetzt: %s", r.json())
 
-# FastAPI: Shutdown
-@app.on_event("shutdown")
-async def on_shutdown():
+    yield  # App läuft hier
+
     await telegram_app.stop()
     await telegram_app.shutdown()
+
+# FastAPI-App mit Lifespan
+app = FastAPI(lifespan=lifespan)
+
+@app.get("/")
+async def root():
+    return {"message": "Yumi Telegram Bot ist online!"}
+
+@app.post("/webhook")
+async def telegram_webhook(request: Request):
+    data = await request.json()
+    update = Update.de_json(data, telegram_app.bot)
+    logger.info("✅ Telegram Update empfangen: %s", data)
+    await telegram_app.process_update(update)
+    return {"status": "ok"}
