@@ -2,6 +2,7 @@ import os
 import logging
 from datetime import datetime
 from telegram import Update
+from bot import app as telegram_app
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, ContextTypes, filters
 import openai
 from db_services import get_user_context, add_message, get_bot_config, add_log
@@ -102,3 +103,9 @@ def get_application():
 
 
 app = get_application()
+# Startet die Hintergrund-Task für FastAPI + Webhook
+async def start_bot():
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()  # Optional: Falls du zusätzlich Polling willst
+
