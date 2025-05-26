@@ -1,5 +1,7 @@
 import os
+import asyncio
 import uvicorn
+import requests
 from fastapi import FastAPI, Request
 from telegram import Update
 from bot import app as telegram_app, start_bot
@@ -17,14 +19,10 @@ async def telegram_webhook(request: Request):
     await telegram_app.update_queue.put(update)
     return {"ok": True}
 
-if __name__ == "__main__":
-    import asyncio
-
-    # Set Webhook automatisch beim Start (optional)
-    import requests
+async def main():
+    # Webhook setzen
     TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
     WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # z.B. https://deinbot.onrender.com/webhook
-
     if TELEGRAM_TOKEN and WEBHOOK_URL:
         r = requests.post(
             f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/setWebhook",
@@ -32,13 +30,20 @@ if __name__ == "__main__":
         )
         print(f"📡 Webhook gesetzt: {r.json()}")
 
-    port = int(os.getenv("PORT", 10000))
+    # Telegram-Bot starten (async)
+    await start_bot()
 
-    async def main():
-        await start_bot()
+async def run_uvicorn():
+    config = uvicorn.Config("main:app", host="0.0.0.0", port=int(os.getenv("PORT", 10000)), log_level="info")
+    server = uvicorn.Server(config)
+    await server.serve()
 
-    # Starte Telegram Bot im Hintergrund
-    asyncio.create_task(main())
+async def main_runner():
+    # Beide Tasks parallel laufen lassen: Telegram-Bot und FastAPI Webserver
+    await asyncio.gather(
+        main(),
+        run_uvicorn()
+    )
 
-    # Starte FastAPI Webserver
-    uvicorn.run("main:app", host="0.0.0.0", port=port, log_level="info")
+if __name__ == "__main__":
+    asyncio.run(main_runner())
