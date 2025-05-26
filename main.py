@@ -3,7 +3,7 @@ import requests
 from fastapi import FastAPI, Request
 import uvicorn
 from telegram import Update
-from bot import app as telegram_app  # Die Telegram Application
+from bot import app as telegram_app, start_bot  # Die Telegram Application
 
 # FastAPI App
 app = FastAPI()
