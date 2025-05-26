@@ -11,11 +11,11 @@ async def root():
     return {"message": "Yumi Bot ist online."}
 
 @app.post("/webhook")
-async def telegram_webhook(request: Request):
-    data = await request.json()
-    update = Update.de_json(data, telegram_app.bot)
-    await telegram_app.process_update(update)
+async def telegram_webhook(update: dict):
+    update = telegram.Update.de_json(update, app.bot)
+    await app.process_update(update)
     return {"ok": True}
+
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 10000))
