@@ -13,6 +13,7 @@ async def root():
 @app.post("/webhook")
 async def telegram_webhook(request: Request):
     data = await request.json()
+    print("✅ Telegram Update empfangen:", data)
     update = Update.de_json(data, telegram_app.bot)
     await telegram_app.update_queue.put(update)
     return {"ok": True}
