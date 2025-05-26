@@ -107,5 +107,5 @@ app = get_application()
 async def start_bot():
     await app.initialize()
     await app.start()
-    await app.updater.start_polling()  # Optional: Falls du zusätzlich Polling willst
+    # await app.updater.start_polling()  # Optional: Falls du zusätzlich Polling willst
 
